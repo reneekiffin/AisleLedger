@@ -1,6 +1,6 @@
 import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
-import { BrowserRouter } from 'react-router-dom'
+import { BrowserRouter, HashRouter } from 'react-router-dom'
 import './index.css'
 import App from './App'
 import { applyTheme, readStoredTheme } from './state/theme'
@@ -9,10 +9,15 @@ import { applyTheme, readStoredTheme } from './state/theme'
 // IndexedDB answers.
 applyTheme(readStoredTheme())
 
+// Static single-file preview builds (VITE_STATIC_PREVIEW=1) have no server to
+// rewrite unknown paths back to index.html, so they route on the hash instead.
+// Real deployments use clean paths.
+const Router = import.meta.env.VITE_STATIC_PREVIEW ? HashRouter : BrowserRouter
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <BrowserRouter>
+    <Router>
       <App />
-    </BrowserRouter>
+    </Router>
   </StrictMode>,
 )

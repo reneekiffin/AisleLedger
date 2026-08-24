@@ -12,6 +12,8 @@ export function UpdateToast() {
   const [updateSW, setUpdateSW] = useState(null)
 
   useEffect(() => {
+    // A static preview build ships no service worker; registering would 404.
+    if (import.meta.env.VITE_STATIC_PREVIEW) return
     const update = registerSW({
       immediate: true,
       onNeedRefresh() {

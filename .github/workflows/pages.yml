@@ -1,0 +1,53 @@
+# Publishes the app to GitHub Pages on every push.
+#
+# `configure-pages` with `enablement: true` switches Pages on the first time
+# this runs, so there is nothing to click in Settings. If your org or account
+# blocks that, turn Pages on manually (Settings -> Pages -> Deploy from a
+# branch -> /docs) and the committed docs/ folder serves the same site.
+name: Deploy to GitHub Pages
+
+on:
+  push:
+    branches: [claude/aisle-ledger-pwa-l6zu2v]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never let two deploys race; queue them instead of cancelling a live one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+
+      - run: npm ci
+
+      # Built here rather than deploying the committed docs/ folder, so the
+      # live site can never be a stale build someone forgot to regenerate.
+      - run: npm run build:pages
+
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: docs
+
+      - id: deployment
+        uses: actions/deploy-pages@v4

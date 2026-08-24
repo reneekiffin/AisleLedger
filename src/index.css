@@ -1,0 +1,170 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/*
+  Three themes, one set of tokens. `data-theme` is set on <html> from the
+  active wedding's saved theme (mirrored into localStorage so the very first
+  paint is already correct — that flag is the only thing we keep outside
+  IndexedDB).
+*/
+:root,
+[data-theme='sage'] {
+  --c-canvas: 247 245 239;
+  --c-surface: 255 255 255;
+  --c-sunken: 240 238 230;
+  --c-line: 226 222 210;
+  --c-ink: 46 50 41;
+  --c-muted: 110 114 104;
+  --c-primary: 124 139 114;
+  --c-primary-deep: 84 96 76;
+  --c-primary-soft: 226 232 220;
+  --c-accent: 197 143 134;
+  --c-accent-soft: 243 227 224;
+  --c-warn: 168 74 54;
+  --c-warn-soft: 247 226 220;
+  --c-good: 94 122 88;
+  --c-theme-meta: #7c8b72;
+
+  /* Spend-by-category ramp: ONE hue, light→dark, assigned by rank so the
+     darkest wedge is the biggest spend. Validated as an ordinal ramp
+     (monotone lightness, ΔL >= 0.06 between steps, light end >= 2:1 on white).
+     Identity never rests on colour alone — the legend beside the chart names
+     and values every wedge. */
+  --viz-1: #a4bc97;
+  --viz-2: #8dab7d;
+  --viz-3: #789966;
+  --viz-4: #648651;
+  --viz-5: #527240;
+  --viz-6: #425f31;
+  --viz-7: #334c25;
+  --viz-other: #b9b6ab;
+}
+
+[data-theme='blush'] {
+  --c-canvas: 250 244 242;
+  --c-surface: 255 255 255;
+  --c-sunken: 245 235 232;
+  --c-line: 234 218 214;
+  --c-ink: 61 44 42;
+  --c-muted: 124 103 100;
+  --c-primary: 181 122 114;
+  --c-primary-deep: 140 88 81;
+  --c-primary-soft: 244 226 222;
+  --c-accent: 124 139 114;
+  --c-accent-soft: 228 234 222;
+  --c-warn: 166 60 47;
+  --c-warn-soft: 250 224 218;
+  --c-good: 116 138 108;
+  --c-theme-meta: #b57a72;
+
+  --viz-1: #dca6a3;
+  --viz-2: #d08d8a;
+  --viz-3: #c07674;
+  --viz-4: #ae615f;
+  --viz-5: #984e4d;
+  --viz-6: #813e3e;
+  --viz-7: #69302f;
+  --viz-other: #bdb2ad;
+}
+
+[data-theme='ivory'] {
+  --c-canvas: 251 249 244;
+  --c-surface: 255 255 255;
+  --c-sunken: 244 240 230;
+  --c-line: 230 223 206;
+  --c-ink: 52 47 37;
+  --c-muted: 116 108 92;
+  --c-primary: 148 128 92;
+  --c-primary-deep: 111 95 65;
+  --c-primary-soft: 238 231 214;
+  --c-accent: 168 141 137;
+  --c-accent-soft: 240 230 228;
+  --c-warn: 163 79 47;
+  --c-warn-soft: 247 230 216;
+  --c-good: 122 128 92;
+  --c-theme-meta: #94805c;
+
+  --viz-1: #ccb288;
+  --viz-2: #bb9d6a;
+  --viz-3: #a88852;
+  --viz-4: #94753e;
+  --viz-5: #7f622e;
+  --viz-6: #6a5123;
+  --viz-7: #54401b;
+  --viz-other: #bcb4a2;
+}
+
+html {
+  /* iOS Safari's 100vh lies when the URL bar is showing. --app-height is kept
+     in sync from useViewportHeight(); svh is the modern fallback. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  @apply bg-canvas text-ink font-sans antialiased;
+  /* Stop the whole page rubber-banding under the tab bar on iOS. */
+  overscroll-behavior-y: none;
+}
+
+#root {
+  min-height: 100svh;
+  min-height: var(--app-height, 100svh);
+}
+
+h1, h2, h3 {
+  @apply font-serif;
+}
+
+/* Inputs must never be smaller than 16px or iOS zooms the viewport on focus. */
+input, select, textarea, button {
+  font-size: max(16px, 1rem);
+}
+
+@layer components {
+  .card {
+    @apply bg-surface border border-line rounded-2xl shadow-card;
+  }
+
+  .field-label {
+    @apply block text-xs font-medium uppercase tracking-[0.14em] text-muted mb-1.5;
+  }
+
+  .field {
+    @apply w-full min-h-[48px] px-3.5 py-3 rounded-xl border border-line bg-surface text-ink
+           placeholder:text-muted/60
+           focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary;
+  }
+
+  .tap {
+    /* Minimum comfortable tap target, everywhere. */
+    @apply min-h-[44px] min-w-[44px];
+  }
+
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 focus-visible:ring-offset-canvas;
+  }
+
+  .eyebrow {
+    @apply text-[11px] font-medium uppercase tracking-[0.16em] text-muted;
+  }
+}
+
+/* While the on-screen keyboard is up there is no room for the tab bar, and on
+   iOS it would float over the keyboard anyway. */
+html.keyboard-open .tab-bar {
+  transform: translateY(120%);
+  pointer-events: none;
+}
+
+@keyframes sheet-in {
+  from { transform: translateY(12%); opacity: 0.6; }
+  to   { transform: translateY(0);   opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}

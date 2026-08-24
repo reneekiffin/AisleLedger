@@ -14,9 +14,12 @@ applyTheme(readStoredTheme())
 // Real deployments use clean paths.
 const Router = import.meta.env.VITE_STATIC_PREVIEW ? HashRouter : BrowserRouter
 
+// Served from a subpath on GitHub Pages; '/' everywhere else.
+const basename = import.meta.env.VITE_STATIC_PREVIEW ? undefined : import.meta.env.BASE_URL
+
 createRoot(document.getElementById('root')).render(
   <StrictMode>
-    <Router>
+    <Router basename={basename}>
       <App />
     </Router>
   </StrictMode>,

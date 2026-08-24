@@ -21,6 +21,11 @@ import { formatMoney } from './money'
 export const REMINDER_LEAD_DAYS = 3
 const SEEN_KEY = 'notifiedInstallments'
 
+// The app may be served from a subpath (GitHub Pages), so notification icons
+// and deep links are built from the base rather than assumed to sit at root.
+const BASE = import.meta.env.BASE_URL
+const ICON = `${BASE}icons/icon-192.png`
+
 export function notificationsSupported() {
   return typeof window !== 'undefined' && 'Notification' in window && 'serviceWorker' in navigator
 }
@@ -103,9 +108,9 @@ export async function syncReminders(schedule, vendors, currency = 'USD') {
       await reg.showNotification('Payment due soon', {
         tag,
         body: reminderBody(withVendor, currency),
-        icon: '/icons/icon-192.png',
-        badge: '/icons/icon-192.png',
-        data: { url: '/payments' },
+        icon: ICON,
+        badge: ICON,
+        data: { url: `${BASE}payments` },
       })
       fired += 1
       continue
@@ -119,9 +124,9 @@ export async function syncReminders(schedule, vendors, currency = 'USD') {
         await reg.showNotification('Payment due soon', {
           tag,
           body: reminderBody(withVendor, currency),
-          icon: '/icons/icon-192.png',
-          badge: '/icons/icon-192.png',
-          data: { url: '/payments' },
+          icon: ICON,
+          badge: ICON,
+          data: { url: `${BASE}payments` },
           // eslint-disable-next-line no-undef
           showTrigger: new TimestampTrigger(fireAt.getTime()),
         })
@@ -142,9 +147,9 @@ export async function sendTestReminder() {
   if (!reg || Notification.permission !== 'granted') return false
   await reg.showNotification('Reminders are on', {
     body: "We'll nudge you 3 days before a payment is due.",
-    icon: '/icons/icon-192.png',
+    icon: ICON,
     tag: 'aisle-ledger-test',
-    data: { url: '/payments' },
+    data: { url: `${BASE}payments` },
   })
   return true
 }

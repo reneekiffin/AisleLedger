@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" role="img" aria-label="Aisle Ledger">
+  <rect width="64" height="64" fill="#F7F5EF"/>
+  <g fill="none" stroke-width="3.4">
+    <circle cx="25.5" cy="32" r="15.5" stroke="#7C8B72"/>
+    <circle cx="38.5" cy="32" r="15.5" stroke="#D9A9A0"/>
+  </g>
+</svg>

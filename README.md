@@ -59,33 +59,53 @@ dev`.
 
 ---
 
-## Deploying to Vercel
+## Deploying — GitHub Pages, nothing else
 
-The repo ships a `vercel.json` with SPA rewrites and the right cache headers
-(`sw.js` must never be cached, hashed assets are immutable).
-
-**From the dashboard**
-
-1. Push this repo to GitHub, then *Add New → Project* on
-   [vercel.com](https://vercel.com) and import it.
-2. Vercel detects Vite. Confirm the defaults — Build Command `npm run build`,
-   Output Directory `dist` — and deploy.
-
-**From the CLI**
+The whole site is static files, so GitHub can host it. No hosting account, no
+CI, no tokens, no third-party service.
 
 ```bash
-npm i -g vercel
-vercel          # preview deployment
-vercel --prod   # production
+npm run build:pages     # builds into docs/
+git add docs && git commit -m "Deploy" && git push
 ```
 
-No environment variables are needed — there is no backend to point at.
+Then, once only:
 
-HTTPS is automatic on Vercel, and it's required: service workers, the install
-prompt and notifications all refuse to run on plain HTTP (`localhost` is the
-one exception).
+1. Repo → **Settings → Pages**
+2. **Source: Deploy from a branch**
+3. Branch: your default branch, folder: **/docs** → **Save**
 
----
+A minute later it's live at
+`https://<your-username>.github.io/AisleLedger/`.
+
+Every later deploy is just the two commands above — build, commit, push.
+
+### Why the build step exists
+
+The app is React, CSS and HTML; the build turns it into plain static files a
+dumb file server can hand out. Nothing needs a server: there's no API, no
+database, no accounts. `docs/` is the finished website, committed into the repo
+so GitHub can serve it directly.
+
+### The two Pages-specific details
+
+**The subpath.** A project repo is served from `/AisleLedger/`, not the domain
+root, so `base` in `vite.config.js` is set to match, and the manifest scope,
+service-worker scope and router basename all derive from it. If you rename the
+repo, change that one constant. For any other host that serves from the root:
+
+```bash
+BASE_PATH=/ npm run build
+```
+
+**Deep links.** Pages has no rewrite rule, so `/AisleLedger/budget` isn't a real
+file. `build:pages` writes a copy of `index.html` to `404.html`; Pages serves
+that for unknown paths, the app boots and routes to the right screen. It comes
+back with a 404 status code, which no one but a crawler will notice. Once the
+service worker is installed, it serves those routes properly anyway.
+
+HTTPS comes free with `github.io`, which matters: service workers, install
+prompts and notifications all refuse to run without it.
 
 ## Generating icons
 
@@ -119,8 +139,8 @@ iOS never shows an install prompt, so this is worth doing properly at least
 once.
 
 1. **Deploy first.** iOS will only add a site to the home screen over HTTPS, so
-   deploy to Vercel (a preview URL is fine). A `localhost` tunnel without HTTPS
-   won't work.
+   publish to GitHub Pages (see above) and use the `github.io` URL. A
+   `localhost` tunnel without HTTPS won't work.
 2. **Open the URL in Safari.** Not Chrome, not Firefox, not the in-app browser
    inside Messages or Slack — on iOS only Safari has *Add to Home Screen*. The
    app detects this and tells you as much.
@@ -158,7 +178,7 @@ once.
 Chrome fires `beforeinstallprompt`, which the app captures — you get a real
 one-tap **Install** button on the Install screen and in the first-visit banner.
 DevTools → Application → Manifest is the quickest way to check the manifest and
-icons resolve.
+icons resolve — worth a look after any change to the repo name or `base`.
 
 ---
 
@@ -183,7 +203,10 @@ src/
   hooks/          autosave, install prompt, iOS viewport height
   components/     ui primitives, bottom tab bar, screen frame
   screens/        one file per screen; phase2/ holds the scaffolded ones
-scripts/generate-icons.mjs
+scripts/
+  generate-icons.mjs   dependency-free PNG icon generator
+  build-pages.mjs      builds docs/ for GitHub Pages
+docs/                  the built site GitHub Pages serves — generated, committed
 ```
 
 ### The data layer

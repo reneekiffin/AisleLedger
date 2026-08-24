@@ -2,7 +2,17 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
+/*
+ * GitHub Pages serves a project repo from a subpath — /AisleLedger/ — not the
+ * domain root, so every asset URL, the manifest scope and the router basename
+ * have to agree on it. Override for any other host:
+ *
+ *   BASE_PATH=/ npm run build
+ */
+const base = process.env.BASE_PATH ?? '/AisleLedger/'
+
 export default defineConfig({
+  base,
   plugins: [
     react(),
     VitePWA({
@@ -21,27 +31,27 @@ export default defineConfig({
         name: 'Aisle Ledger',
         short_name: 'Aisle Ledger',
         description: 'A private, offline wedding budget planner that lives on your device.',
-        id: '/',
-        start_url: '/',
-        scope: '/',
+        id: base,
+        start_url: base,
+        scope: base,
         display: 'standalone',
         orientation: 'portrait',
         theme_color: '#7C8B72',
         background_color: '#F7F5EF',
         categories: ['finance', 'lifestyle', 'productivity'],
         icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: '/icons/maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-          { src: '/icons/maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: `${base}icons/icon-192.png`, sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: `${base}icons/icon-512.png`, sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: `${base}icons/maskable-192.png`, sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: `${base}icons/maskable-512.png`, sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
         // Precache the whole app shell so the app boots with no network at all.
         globPatterns: ['**/*.{js,css,html,svg,png,ico,webmanifest}'],
-        navigateFallback: '/index.html',
+        navigateFallback: `${base}index.html`,
         // Adds the notificationclick handler to the generated worker.
-        importScripts: ['/sw-notifications.js'],
+        importScripts: [`${base}sw-notifications.js`],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
       },

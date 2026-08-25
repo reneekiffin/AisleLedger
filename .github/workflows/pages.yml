@@ -51,3 +51,31 @@ jobs:
 
       - id: deployment
         uses: actions/deploy-pages@v4
+
+      # deploy-pages reports success for its own deployment, which is not the
+      # same as the URL serving it. This project hit exactly that: with the
+      # Pages source still set to a branch, GitHub's own builder republished
+      # the repo root seconds later, so the live page served Vite's source
+      # template - an empty #root and a /src/main.jsx no browser can run - and
+      # every run was still green. Assert the real page instead.
+      - name: Verify the live URL serves the built app
+        env:
+          PAGE_URL: ${{ steps.deployment.outputs.page_url }}
+        run: |
+          set -uo pipefail
+          body=""
+          for wait in 5 10 20 30 45 60; do
+            sleep "$wait"
+            body=$(curl -fsSL --max-time 30 "$PAGE_URL" || true)
+            # The built page loads a hashed bundle; the source template loads
+            # /src/main.jsx. Only one of those means a working site.
+            if printf '%s' "$body" | grep -qE 'assets/index-[A-Za-z0-9_-]+\.js'; then
+              echo "OK: $PAGE_URL is serving the built app."
+              exit 0
+            fi
+            echo "Not live yet (waited ${wait}s), retrying..."
+          done
+          echo "::error::$PAGE_URL is not serving the built app."
+          echo "--- what the URL actually returned ---"
+          printf '%s' "$body" | head -c 1000
+          exit 1

@@ -62,30 +62,51 @@ dev`.
 ## Deploying — GitHub Pages, nothing else
 
 The whole site is static files, so GitHub can host it. No hosting account, no
-CI, no tokens, no third-party service.
+tokens, no third-party service.
+
+### Set the source once
+
+Repo → **Settings → Pages** → Source → **GitHub Actions**.
+
+That single dropdown is the whole configuration, and it is easy to get wrong in
+a way that looks like success. If the source is left on *Deploy from a branch*
+pointed at the branch root, GitHub runs its own builder on every push and
+publishes the repo root — which has no `index.html`, so the site comes up
+empty. The `pages.yml` workflow still reports a green deploy; the branch
+builder simply finishes afterwards and overwrites it.
+
+**A green workflow run is not evidence the site is live. Load the URL.**
+
+(The workflow's `configure-pages` step turns Pages on when it is off, but it
+does not switch an already-enabled site from *branch* to *Actions*. Only the
+dropdown does that.)
+
+### After that, publishing is pushing
+
+`.github/workflows/pages.yml` builds the app and deploys it on every push to
+the default branch. Live at `https://<your-username>.github.io/AisleLedger/`
+about a minute later. Nothing to build or commit by hand.
+
+### No-CI alternative
+
+If you would rather not use Actions at all, delete
+`.github/workflows/pages.yml` and set Source → **Deploy from a branch** → your
+branch → folder **/docs**. `docs/` is a committed copy of the built site:
 
 ```bash
-npm run build:pages     # builds into docs/
+npm run build:pages
 git add docs && git commit -m "Deploy" && git push
 ```
 
-Then, once only:
-
-1. Repo → **Settings → Pages**
-2. **Source: Deploy from a branch**
-3. Branch: your default branch, folder: **/docs** → **Save**
-
-A minute later it's live at
-`https://<your-username>.github.io/AisleLedger/`.
-
-Every later deploy is just the two commands above — build, commit, push.
+Pick one path or the other. Running both is exactly what causes the silent
+overwrite described above.
 
 ### Why the build step exists
 
 The app is React, CSS and HTML; the build turns it into plain static files a
 dumb file server can hand out. Nothing needs a server: there's no API, no
-database, no accounts. `docs/` is the finished website, committed into the repo
-so GitHub can serve it directly.
+database, no accounts. The workflow runs that build for you; `docs/` is a
+committed copy of the same output, there so the no-CI path above works.
 
 ### The two Pages-specific details
 

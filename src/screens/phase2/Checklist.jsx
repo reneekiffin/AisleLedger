@@ -8,8 +8,18 @@ import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { SelectField, TextField } from '../../components/ui/Field'
 import { PlusIcon } from '../../components/nav/Icons'
-import { addTask, deleteTask, toggleTask } from '../../db/repo'
-import { formatMonth, monthDiff, offsetToMonth, todayISO, toISODate } from '../../lib/dates'
+import { addTask, deleteTask, resetTaskDates, toggleTask, updateTask } from '../../db/repo'
+import {
+  formatDate,
+  formatMonth,
+  monthDiff,
+  monthOffsetForDate,
+  offsetToMonth,
+  relativeDays,
+  taskDueDate,
+  todayISO,
+  toISODate,
+} from '../../lib/dates'
 
 /**
  * The checklist is generated from the wedding date, so it re-flows the moment
@@ -25,14 +35,25 @@ export default function Checklist() {
     [wedding?.weddingDate],
   )
 
+  // Group by the month a task actually lands in — a pinned date can move a
+  // task out of the month its template offset put it in.
   const grouped = useMemo(() => {
     const groups = new Map()
     for (const task of tasks) {
-      if (!groups.has(task.dueMonthOffset)) groups.set(task.dueMonthOffset, [])
-      groups.get(task.dueMonthOffset).push(task)
+      const due = taskDueDate(wedding?.weddingDate, task)
+      const offset = task.dueDate
+        ? monthOffsetForDate(wedding?.weddingDate, task.dueDate)
+        : task.dueMonthOffset
+      if (!groups.has(offset)) groups.set(offset, [])
+      groups.get(offset).push({ ...task, due })
+    }
+    for (const rows of groups.values()) {
+      rows.sort((a, b) => (a.due < b.due ? -1 : a.due > b.due ? 1 : 0))
     }
     return [...groups.entries()].sort(([a], [b]) => a - b)
-  }, [tasks])
+  }, [tasks, wedding?.weddingDate])
+
+  const pinned = useMemo(() => tasks.filter((t) => t.dueDate).length, [tasks])
 
   const done = tasks.filter((t) => t.done).length
 
@@ -65,6 +86,19 @@ export default function Checklist() {
           value={tasks.length ? (done / tasks.length) * 100 : 0}
           label="Checklist progress"
         />
+        <p className="mt-3 border-t border-line pt-3 text-sm text-muted">
+          Dates are worked out from your wedding day, so moving the date moves the whole plan. Tap
+          any date to change just that one.
+        </p>
+        {pinned > 0 && (
+          <button
+            type="button"
+            onClick={() => track(() => resetTaskDates(weddingId))}
+            className="tap mt-1 rounded-lg text-sm font-medium text-primary-deep focus-ring"
+          >
+            Reset {pinned} changed {pinned === 1 ? 'date' : 'dates'} to the suggested schedule
+          </button>
+        )}
       </Card>
 
       {tasks.length === 0 ? (
@@ -110,8 +144,36 @@ export default function Checklist() {
                           aria-label={task.title}
                           className="mt-0.5 h-5 w-5 shrink-0 accent-[rgb(var(--c-primary))]"
                         />
-                        <span className={`min-w-0 flex-1 ${task.done ? 'text-muted line-through' : ''}`}>
-                          {task.title}
+                        <span className="min-w-0 flex-1">
+                          <span className={task.done ? 'text-muted line-through' : ''}>
+                            {task.title}
+                          </span>
+                          <span className="mt-1 flex flex-wrap items-center gap-2">
+                            <label className="relative inline-flex">
+                              <span className="sr-only">Due date for {task.title}</span>
+                              <input
+                                type="date"
+                                value={task.due}
+                                onChange={(e) =>
+                                  track(() =>
+                                    updateTask(task.id, {
+                                      dueDate: e.target.value,
+                                      dueMonthOffset: e.target.value
+                                        ? monthOffsetForDate(wedding.weddingDate, e.target.value)
+                                        : task.dueMonthOffset,
+                                    }),
+                                  )
+                                }
+                                className="tap rounded-lg border border-line bg-surface px-2 py-1 text-xs tabular-nums focus-ring"
+                              />
+                            </label>
+                            {!task.done && task.due && (
+                              <span className="text-xs text-muted">{relativeDays(task.due)}</span>
+                            )}
+                            {task.dueDate && (
+                              <span className="text-[11px] text-muted">changed</span>
+                            )}
+                          </span>
                         </span>
                         <button
                           type="button"

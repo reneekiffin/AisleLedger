@@ -368,7 +368,7 @@ export default function Settings() {
         </div>
       </section>
 
-      <section className="mt-7">
+      <section className="mt-7" id="backups">
         <SectionHeader title="Backups" />
         <BackupSection />
       </section>

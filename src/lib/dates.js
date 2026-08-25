@@ -127,3 +127,36 @@ export function relativeDays(value) {
   if (diff > 0) return `in ${diff} days`
   return `${Math.abs(diff)} days ago`
 }
+
+/**
+ * The date a checklist task is aimed at.
+ *
+ * With no pinned `dueDate`, it's derived from the wedding date and the task's
+ * month offset — so moving the wedding moves the whole plan. Editing a task's
+ * date pins it, and that pin wins from then on.
+ *
+ * Suggested dates land mid-month (the 15th), except the wedding month itself,
+ * where everything is pulled to the week before the day.
+ */
+export function taskDueDate(weddingDate, task) {
+  if (task?.dueDate) return task.dueDate
+  const wedding = parseDate(weddingDate)
+  if (!wedding) return ''
+
+  if (task.dueMonthOffset === 0) {
+    const week = new Date(wedding)
+    week.setDate(week.getDate() - 7)
+    return toISODate(week)
+  }
+
+  const month = addMonths(weddingDate, task.dueMonthOffset)
+  if (!month) return ''
+  const lastDay = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
+  return toISODate(new Date(month.getFullYear(), month.getMonth(), Math.min(15, lastDay)))
+}
+
+/** Which month bucket a pinned date belongs in, relative to the wedding. */
+export function monthOffsetForDate(weddingDate, date) {
+  const diff = monthDiff(date, weddingDate)
+  return diff === null ? 0 : -diff
+}

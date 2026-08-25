@@ -71,6 +71,19 @@ export async function exportBackup() {
   return { method, filename, at }
 }
 
+/**
+ * v1 backups carry the seating store under its old name. Nothing was ever
+ * written to it (the name collided with a Dexie built-in, so every write
+ * threw), but remap it rather than silently dropping the key.
+ */
+function upgradeBackup(data) {
+  if ('tables' in data && !('seatingTables' in data)) {
+    data.seatingTables = data.tables
+    delete data.tables
+  }
+  return data
+}
+
 export function parseBackup(text) {
   let data
   try {
@@ -84,7 +97,7 @@ export function parseBackup(text) {
   if (Number(data.schemaVersion) > SCHEMA_VERSION) {
     throw new Error('That backup was made by a newer version of Aisle Ledger. Update the app first.')
   }
-  return data
+  return upgradeBackup(data)
 }
 
 /**

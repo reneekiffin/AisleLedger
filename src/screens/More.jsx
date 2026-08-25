@@ -8,7 +8,8 @@ import { formatMoney } from '../lib/money'
 import { countdown } from '../lib/dates'
 
 const PHASE_TWO = [
-  { to: '/guests', title: 'Guest list', body: 'RSVPs, meals and parties' },
+  { to: '/guests', title: 'Guest list', body: 'Import from another app, RSVPs, meals and parties' },
+  { to: '/party', title: 'Wedding party', body: 'Who stands with you, and where to buy their outfits' },
   { to: '/checklist', title: '12-month checklist', body: 'Auto-built from your wedding date' },
   { to: '/seating', title: 'Seating chart', body: 'Tables, capacity and who sits where' },
   { to: '/timeline', title: 'Wedding-day timeline', body: 'Hour by hour on the day' },
@@ -16,7 +17,8 @@ const PHASE_TWO = [
 ]
 
 const APP = [
-  { to: '/settings', title: 'Settings', body: 'Wedding details, theme, reminders, backups' },
+  { to: '/settings#backups', title: 'Back up your data', body: 'Export a copy, or restore one onto a new phone' },
+  { to: '/settings', title: 'Settings', body: 'Wedding details, theme, reminders' },
   { to: '/install', title: 'Install on your phone', body: 'Add Aisle Ledger to your home screen' },
   { to: '/privacy', title: 'Privacy', body: 'What we collect (nothing)' },
 ]

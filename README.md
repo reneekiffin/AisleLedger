@@ -20,6 +20,9 @@ IndexedDB, and nothing is ever transmitted.
 | **Payments** | Per-vendor installments (deposit / mid / final) on one timeline, grouped by month, with overdue flagged. Marking one paid writes a real payment record |
 | **Per-head costs** | Categories flagged "priced per guest" keep a rate and re-price themselves the moment the guest count changes |
 | **Vendor comparison** | Line up every quote in a category; **Choose** books one and pulls its quote through as the contract price |
+| **Guest list import** | Reads a CSV exported from The Knot, Zola, Joy or a spreadsheet. Columns are auto-detected and confirmable; tables named in the file are created and guests seated. Exports back to CSV |
+| **Wedding party** | Who stands with you, what they're wearing, size, colour, cost, and a direct link to buy it — plus a shared list of shops for bridesmaid dresses and suits |
+| **Checklist dates** | Every milestone gets a date derived from the wedding day, so moving the date re-flows the plan. Any single date can be pinned, and pinned dates reset in one tap |
 
 **Phase 2 — scaffolded, with a working basic UI**
 

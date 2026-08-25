@@ -6,6 +6,7 @@ import { Card, EmptyState, SectionHeader } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { TextField } from '../../components/ui/Field'
+import { ColourWheel, isValidHex } from '../../components/ui/ColourWheel'
 import { PlusIcon } from '../../components/nav/Icons'
 import { addMoodboardItem, deleteMoodboardItem, listMoodboard } from '../../db/repo'
 
@@ -328,21 +329,86 @@ export default function Moodboard() {
   )
 }
 
+/** Wedding-palette starting points, so the wheel isn't a blank stare. */
+const PALETTE_PRESETS = [
+  '#7C8B72', '#C58F86', '#D9C9A3', '#9BAAB2',
+  '#B0846A', '#8E7C9B', '#D7B9C4', '#5E6B55',
+]
+
 function ColourForm({ onSubmit }) {
   const [value, setValue] = useState('#7C8B72')
+  // Kept separate from `value` so a half-typed hex doesn't fight the wheel.
+  const [hexInput, setHexInput] = useState('#7C8B72')
+
+  const setColour = (next) => {
+    setValue(next)
+    setHexInput(next)
+  }
+
+  const onHexChange = (raw) => {
+    setHexInput(raw)
+    if (isValidHex(raw)) {
+      const withHash = raw.startsWith('#') ? raw : `#${raw}`
+      setValue(withHash.length === 4
+        ? `#${withHash.slice(1).split('').map((c) => c + c).join('')}`
+        : withHash)
+    }
+  }
+
   return (
-    <div className="space-y-5">
-      <label className="block">
-        <span className="field-label">Colour</span>
-        <input
-          type="color"
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          className="h-16 w-full cursor-pointer rounded-xl border border-line bg-surface p-1"
+    <div className="space-y-6">
+      <ColourWheel value={value} onChange={setColour} />
+
+      <div className="flex items-center gap-3">
+        <span
+          aria-hidden="true"
+          className="h-12 w-12 shrink-0 rounded-xl border border-line"
+          style={{ background: value }}
         />
-      </label>
-      <TextField label="Hex" value={value} onChange={(e) => setValue(e.target.value)} />
-      <Button full onClick={() => onSubmit(value)}>
+        <div className="min-w-0 flex-1">
+          <TextField
+            label="Hex"
+            value={hexInput}
+            autoCapitalize="none"
+            autoCorrect="off"
+            spellCheck={false}
+            onChange={(e) => onHexChange(e.target.value)}
+            error={hexInput && !isValidHex(hexInput) ? 'Not a hex colour' : undefined}
+          />
+        </div>
+        <label className="shrink-0 self-end pb-1">
+          <span className="sr-only">Pick with your device colour picker</span>
+          <input
+            type="color"
+            value={value}
+            onChange={(e) => setColour(e.target.value)}
+            className="tap h-12 w-12 cursor-pointer rounded-xl border border-line bg-surface p-1"
+          />
+        </label>
+      </div>
+
+      <div>
+        <span className="field-label">Wedding favourites</span>
+        <ul className="flex flex-wrap gap-2">
+          {PALETTE_PRESETS.map((preset) => (
+            <li key={preset}>
+              <button
+                type="button"
+                onClick={() => setColour(preset)}
+                aria-label={`Use ${preset}`}
+                className={`tap h-10 w-10 rounded-full border transition-transform focus-ring ${
+                  value.toLowerCase() === preset.toLowerCase()
+                    ? 'border-ink scale-110'
+                    : 'border-line'
+                }`}
+                style={{ background: preset }}
+              />
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <Button full disabled={!isValidHex(value)} onClick={() => onSubmit(value)}>
         Add to palette
       </Button>
     </div>

@@ -22,6 +22,7 @@ import Checklist from './screens/phase2/Checklist'
 import Seating from './screens/phase2/Seating'
 import DayTimeline from './screens/phase2/DayTimeline'
 import Moodboard from './screens/phase2/Moodboard'
+import WeddingParty from './screens/phase2/WeddingParty'
 
 /** Screens reachable before any wedding exists. */
 const PUBLIC_PATHS = ['/onboarding', '/privacy', '/install']
@@ -67,6 +68,7 @@ function Shell() {
         <Route path="/seating" element={<Seating />} />
         <Route path="/timeline" element={<DayTimeline />} />
         <Route path="/moodboard" element={<Moodboard />} />
+        <Route path="/party" element={<WeddingParty />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
       {showTabs && <BottomTabBar />}

@@ -85,6 +85,10 @@ export async function createWedding(details, categoryChoices = DEFAULT_CATEGORIE
     weddingId: id,
     title,
     dueMonthOffset,
+    // Left empty on purpose: with no explicit date the checklist derives one
+    // from the wedding date, so moving the wedding re-flows the whole plan.
+    // Editing a task's date fills this in and pins it.
+    dueDate: '',
     done: false,
   }))
 
@@ -232,7 +236,7 @@ export async function addVendor(weddingId, vendor) {
     quoteAmount: Number(vendor.quoteAmount) || 0,
     contractPrice: Number(vendor.contractPrice) || 0,
     status: vendor.status === 'booked' ? 'booked' : 'considering',
-    contractLink: vendor.contractLink || '',
+    contractLink: normaliseUrl(vendor.contractLink),
     createdAt: nowIso(),
   })
   await touch(weddingId)
@@ -245,6 +249,8 @@ export async function updateVendor(id, changes) {
   const patch = { ...changes }
   if ('quoteAmount' in patch) patch.quoteAmount = Number(patch.quoteAmount) || 0
   if ('contractPrice' in patch) patch.contractPrice = Number(patch.contractPrice) || 0
+  // Without a scheme a pasted domain resolves inside the app and 404s.
+  if ('contractLink' in patch) patch.contractLink = normaliseUrl(patch.contractLink)
   await db.vendors.update(id, patch)
   await touch(vendor.weddingId)
 }
@@ -410,11 +416,32 @@ export async function toggleTask(id, done) {
   await touch(task.weddingId)
 }
 
-export async function addTask(weddingId, { title, dueMonthOffset = 0 }) {
+export async function addTask(weddingId, { title, dueMonthOffset = 0, dueDate = '' }) {
   const id = uid()
-  await db.tasks.add({ id, weddingId, title: title?.trim() || 'Untitled task', dueMonthOffset, done: false })
+  await db.tasks.add({
+    id,
+    weddingId,
+    title: title?.trim() || 'Untitled task',
+    dueMonthOffset,
+    dueDate,
+    done: false,
+  })
   await touch(weddingId)
   return id
+}
+
+export async function updateTask(id, changes) {
+  const task = await db.tasks.get(id)
+  if (!task) return
+  await db.tasks.update(id, changes)
+  await touch(task.weddingId)
+}
+
+/** Drops every pinned date, putting the whole checklist back on the schedule
+ *  derived from the wedding date. */
+export async function resetTaskDates(weddingId) {
+  await db.tasks.where('weddingId').equals(weddingId).modify({ dueDate: '' })
+  await touch(weddingId)
 }
 
 export async function deleteTask(id) {
@@ -453,6 +480,69 @@ export async function updateGuest(id, changes) {
   await touch(guest.weddingId)
 }
 
+/**
+ * Bulk import from a CSV.
+ *
+ * Tables named in the file are found or created, so an imported seating plan
+ * lands intact instead of dropping the assignments on the floor.
+ *
+ * @param {Array} incoming  records from buildGuests()
+ * @param {{ skipDuplicates?: boolean }} options  match on name, case-insensitive
+ */
+export async function importGuests(weddingId, incoming, { skipDuplicates = true } = {}) {
+  const existing = await db.guests.where('weddingId').equals(weddingId).toArray()
+  const seen = new Set(existing.map((g) => g.name.trim().toLowerCase()))
+
+  const tables = await db.seatingTables.where('weddingId').equals(weddingId).toArray()
+  const tablesByName = new Map(tables.map((t) => [t.name.trim().toLowerCase(), t]))
+  let tableCount = tables.length
+
+  const newTables = []
+  const newGuests = []
+  let duplicates = 0
+
+  for (const record of incoming) {
+    const key = record.name.trim().toLowerCase()
+    if (skipDuplicates && seen.has(key)) {
+      duplicates += 1
+      continue
+    }
+    seen.add(key)
+
+    let tableId = null
+    const tableName = record.tableName?.trim()
+    if (tableName) {
+      const tableKey = tableName.toLowerCase()
+      let table = tablesByName.get(tableKey)
+      if (!table) {
+        table = { id: uid(), weddingId, name: tableName, capacity: 8, order: tableCount++ }
+        tablesByName.set(tableKey, table)
+        newTables.push(table)
+      }
+      tableId = table.id
+    }
+
+    newGuests.push({
+      id: uid(),
+      weddingId,
+      name: record.name.trim(),
+      party: record.party || '',
+      rsvp: record.rsvp || 'pending',
+      mealChoice: record.mealChoice || '',
+      tableId,
+      notes: record.notes || '',
+    })
+  }
+
+  await db.transaction('rw', db.guests, db.seatingTables, async () => {
+    if (newTables.length) await db.seatingTables.bulkAdd(newTables)
+    if (newGuests.length) await db.guests.bulkAdd(newGuests)
+  })
+  await touch(weddingId)
+
+  return { imported: newGuests.length, duplicates, tablesCreated: newTables.length }
+}
+
 export async function deleteGuest(id) {
   const guest = await db.guests.get(id)
   if (!guest) return
@@ -461,13 +551,13 @@ export async function deleteGuest(id) {
 }
 
 export function listTables(weddingId) {
-  return db.tables.where('weddingId').equals(weddingId).toArray()
+  return db.seatingTables.where('weddingId').equals(weddingId).toArray()
 }
 
 export async function addTable(weddingId, { name, capacity = 8 }) {
-  const existing = await db.tables.where('weddingId').equals(weddingId).count()
+  const existing = await db.seatingTables.where('weddingId').equals(weddingId).count()
   const id = uid()
-  await db.tables.add({
+  await db.seatingTables.add({
     id,
     weddingId,
     name: name?.trim() || `Table ${existing + 1}`,
@@ -479,22 +569,124 @@ export async function addTable(weddingId, { name, capacity = 8 }) {
 }
 
 export async function updateTable(id, changes) {
-  const table = await db.tables.get(id)
+  const table = await db.seatingTables.get(id)
   if (!table) return
   const patch = { ...changes }
   if ('capacity' in patch) patch.capacity = Number(patch.capacity) || 0
-  await db.tables.update(id, patch)
+  await db.seatingTables.update(id, patch)
   await touch(table.weddingId)
 }
 
 export async function deleteTable(id) {
-  const table = await db.tables.get(id)
+  const table = await db.seatingTables.get(id)
   if (!table) return
-  await db.transaction('rw', db.tables, db.guests, async () => {
-    await db.tables.delete(id)
+  await db.transaction('rw', db.seatingTables, db.guests, async () => {
+    await db.seatingTables.delete(id)
     await db.guests.where('tableId').equals(id).modify({ tableId: null })
   })
   await touch(table.weddingId)
+}
+
+// ------------------------------------------------ wedding party & shopping
+
+/** The roles offered when adding someone, in the order they're listed. */
+export const PARTY_ROLES = [
+  'Maid of Honour',
+  'Matron of Honour',
+  'Best Man',
+  'Bridesmaid',
+  'Groomsman',
+  'Bridesman',
+  'Groomswoman',
+  'Usher',
+  'Flower Girl',
+  'Ring Bearer',
+  'Officiant',
+  'Reader',
+  'Other',
+]
+
+export function listParty(weddingId) {
+  return db.weddingParty.where('weddingId').equals(weddingId).toArray()
+}
+
+export async function addPartyMember(weddingId, member) {
+  const existing = await db.weddingParty.where('weddingId').equals(weddingId).count()
+  const id = uid()
+  await db.weddingParty.add({
+    id,
+    weddingId,
+    name: member.name?.trim() || 'Someone lovely',
+    role: member.role || 'Bridesmaid',
+    phone: member.phone || '',
+    email: member.email || '',
+    // What they're wearing, and where it came from.
+    outfit: member.outfit || '',
+    outfitUrl: normaliseUrl(member.outfitUrl),
+    size: member.size || '',
+    colour: member.colour || '',
+    cost: Number(member.cost) || 0,
+    paidBy: member.paidBy || '',
+    ordered: !!member.ordered,
+    notes: member.notes || '',
+    order: existing,
+  })
+  await touch(weddingId)
+  return id
+}
+
+export async function updatePartyMember(id, changes) {
+  const member = await db.weddingParty.get(id)
+  if (!member) return
+  const patch = { ...changes }
+  if ('cost' in patch) patch.cost = Number(patch.cost) || 0
+  if ('outfitUrl' in patch) patch.outfitUrl = normaliseUrl(patch.outfitUrl)
+  await db.weddingParty.update(id, patch)
+  await touch(member.weddingId)
+}
+
+export async function deletePartyMember(id) {
+  const member = await db.weddingParty.get(id)
+  if (!member) return
+  await db.weddingParty.delete(id)
+  await touch(member.weddingId)
+}
+
+export function listShopLinks(weddingId) {
+  return db.shopLinks.where('weddingId').equals(weddingId).toArray()
+}
+
+/** A shop the party is buying from — e.g. bridesmaid dresses at Birdy Grey. */
+export async function addShopLink(weddingId, link) {
+  const existing = await db.shopLinks.where('weddingId').equals(weddingId).count()
+  const id = uid()
+  await db.shopLinks.add({
+    id,
+    weddingId,
+    label: link.label?.trim() || 'Shop',
+    url: normaliseUrl(link.url),
+    forRole: link.forRole || 'Bridesmaid',
+    note: link.note || '',
+    order: existing,
+  })
+  await touch(weddingId)
+  return id
+}
+
+export async function updateShopLink(id, changes) {
+  const link = await db.shopLinks.get(id)
+  if (!link) return
+  const patch = { ...changes }
+  if ('url' in patch) patch.url = normaliseUrl(patch.url)
+  await db.shopLinks.update(id, patch)
+  await touch(link.weddingId)
+}
+
+export async function deleteShopLink(id) {
+  const link = await db.shopLinks.get(id)
+  if (!link) return
+  await db.shopLinks.delete(id)
+  await touch(link.weddingId)
 }
 
 // ------------------------------------------- phase 2: timeline, moodboard
@@ -560,4 +752,16 @@ export function today() {
 
 function round2(n) {
   return Math.round(n * 100) / 100
+}
+
+/**
+ * People paste "birdygrey.com" as often as a full URL; without a scheme the
+ * browser treats it as a relative path and the link 404s inside the app.
+ */
+export function normaliseUrl(value) {
+  const trimmed = String(value ?? '').trim()
+  if (!trimmed) return ''
+  if (/^https?:\/\//i.test(trimmed)) return trimmed
+  if (/^[\w.-]+\.[a-z]{2,}(\/|$)/i.test(trimmed)) return `https://${trimmed}`
+  return trimmed
 }

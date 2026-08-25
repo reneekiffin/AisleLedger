@@ -7,7 +7,10 @@ import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { SelectField, TextField } from '../../components/ui/Field'
 import { PlusIcon } from '../../components/nav/Icons'
-import { addGuest, deleteGuest, listGuests, updateGuest } from '../../db/repo'
+import { addGuest, deleteGuest, importGuests, listGuests, listTables, updateGuest } from '../../db/repo'
+import { GuestImportSheet } from '../../components/GuestImportSheet'
+import { guestsToCsv } from '../../lib/csv'
+import { shareTextFile } from '../../lib/share'
 
 const RSVP = [
   { value: 'pending', label: 'Pending' },
@@ -88,10 +91,27 @@ function GuestSheet({ open, onClose, onSubmit, parties }) {
 }
 
 export default function Guests() {
-  const { weddingId } = useWedding()
+  const { wedding, weddingId } = useWedding()
   const guests = useWeddingTable(listGuests) ?? []
+  const tables = useWeddingTable(listTables) ?? []
   const track = useTrackedAction()
   const [adding, setAdding] = useState(false)
+  const [importing, setImporting] = useState(false)
+  const [result, setResult] = useState('')
+
+  const exportCsv = async () => {
+    const tablesById = new Map(tables.map((t) => [t.id, t]))
+    const slug = (wedding?.coupleNames || 'guest-list')
+      .replace(/[^\w]+/g, '-')
+      .replace(/^-|-$/g, '')
+      .toLowerCase()
+    const outcome = await shareTextFile(
+      guestsToCsv(guests, tablesById),
+      `${slug || 'guest-list'}-guests.csv`,
+      'text/csv',
+    )
+    if (outcome !== 'cancelled') setResult(`Exported ${guests.length} guests.`)
+  }
 
   const parties = useMemo(
     () => [...new Set(guests.map((g) => g.party).filter(Boolean))].sort(),
@@ -137,12 +157,29 @@ export default function Guests() {
         <StatTile label="Awaiting" value={counts.pending} tone="muted" />
       </div>
 
+      <div className="mt-3 flex gap-3">
+        <Button full variant="secondary" onClick={() => setImporting(true)}>
+          Import list
+        </Button>
+        <Button full variant="secondary" disabled={!guests.length} onClick={exportCsv}>
+          Export CSV
+        </Button>
+      </div>
+      {result && <p className="mt-2 text-center text-sm text-muted">{result}</p>}
+
       {guests.length === 0 ? (
         <div className="mt-7">
           <EmptyState
             title="No guests yet"
-            body="Add people as you invite them. Parties keep families and couples together for seating."
-            action={<Button onClick={() => setAdding(true)}>Add your first guest</Button>}
+            body="Already have a list in The Knot, Zola or a spreadsheet? Import it. Otherwise add people as you invite them — parties keep families and couples together for seating."
+            action={
+              <div className="flex flex-col gap-2.5 sm:flex-row">
+                <Button onClick={() => setImporting(true)}>Import a guest list</Button>
+                <Button variant="secondary" onClick={() => setAdding(true)}>
+                  Add one by hand
+                </Button>
+              </div>
+            }
           />
         </div>
       ) : (
@@ -188,6 +225,20 @@ export default function Guests() {
           ))}
         </div>
       )}
+
+      <GuestImportSheet
+        open={importing}
+        onClose={() => setImporting(false)}
+        onImport={async (records, options) => {
+          const outcome = await track(() => importGuests(weddingId, records, options))
+          setResult(
+            `Imported ${outcome.imported} guests` +
+              (outcome.duplicates ? `, skipped ${outcome.duplicates} already on the list` : '') +
+              (outcome.tablesCreated ? `, created ${outcome.tablesCreated} tables` : '') +
+              '.',
+          )
+        }}
+      />
 
       <GuestSheet
         open={adding}

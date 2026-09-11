@@ -23,11 +23,20 @@ export const DEFAULT_CATEGORIES = [
 ]
 
 /**
+ * Bump when tasks are ADDED to the template below. Weddings created before the
+ * bump are topped up with only the newer items the next time they're opened,
+ * so an existing checklist gains what's new without resurrecting anything the
+ * couple deliberately deleted.
+ */
+export const TASK_TEMPLATE_VERSION = 2
+
+/**
  * The 12-month checklist template.
  *
- * `dueMonthOffset` is months relative to the wedding date: -12 is a year out,
- * 0 is the wedding month, +1 is the month after. Dates are only derived at
- * render time, so moving the wedding date re-flows the whole checklist.
+ * `[dueMonthOffset, title, introducedIn]` — offset is months relative to the
+ * wedding date: -12 is a year out, 0 is the wedding month, +1 is the month
+ * after. Dates are only derived at render time, so moving the wedding date
+ * re-flows the whole checklist. `introducedIn` defaults to 1.
  */
 export const DEFAULT_TASKS = [
   [-12, 'Set the overall budget and who is contributing'],
@@ -50,17 +59,22 @@ export const DEFAULT_TASKS = [
   [-5, 'Book transport for the day'],
   [-4, 'Choose and order the cake'],
   [-4, 'Book hair and make-up trials'],
+  [-4, 'Book grooming appointments — barber, brows, nails, tan', 2],
   [-3, 'Send the invitations'],
   [-3, 'Buy wedding rings'],
   [-3, 'Book the officiant and confirm paperwork'],
   [-2, 'First dress or suit fitting'],
+  [-2, 'Hair colour or cut — 2 to 3 weeks out, never the week of', 2],
   [-2, 'Draft the day-of timeline'],
   [-2, 'Order favours and gifts'],
   [-1, 'Chase outstanding RSVPs'],
   [-1, 'Finalise the seating chart'],
   [-1, 'Confirm final headcount with the caterer'],
   [-1, 'Final fitting'],
+  [-1, 'Facial or skin treatment — leave 2 weeks, so nothing reacts', 2],
   [-1, 'Confirm arrival times with every vendor'],
+  [0, 'Haircut and beard trim — about a week before', 2],
+  [0, 'Nails, brows and any spray tan — 2 to 3 days before', 2],
   [0, 'Pay outstanding vendor balances'],
   [0, 'Pack for the honeymoon'],
   [0, 'Hand out gratuities and final payments'],

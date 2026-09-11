@@ -46,6 +46,12 @@ export function WeddingProvider({ children }) {
     if (wedding?.theme) applyTheme(wedding.theme)
   }, [wedding?.theme])
 
+  // Bring an older wedding's checklist up to the current template. No-ops once
+  // the versions match, so this costs one indexed read per wedding switch.
+  useEffect(() => {
+    if (weddingId) repo.topUpTasks(weddingId)
+  }, [weddingId])
+
   // Keep the stored pointer honest after a delete or an import.
   useEffect(() => {
     if (weddingId !== undefined && weddingId !== activeId && weddings) {

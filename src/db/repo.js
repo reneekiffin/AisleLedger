@@ -1,5 +1,10 @@
 import { db, uid, nowIso, WEDDING_TABLES, SCHEMA_VERSION } from './db'
-import { DEFAULT_CATEGORIES, DEFAULT_DAY_TIMELINE, DEFAULT_TASKS } from './seed'
+import {
+  DEFAULT_CATEGORIES,
+  DEFAULT_DAY_TIMELINE,
+  DEFAULT_TASKS,
+  TASK_TEMPLATE_VERSION,
+} from './seed'
 
 /**
  * The only module that talks to Dexie directly.
@@ -58,6 +63,7 @@ export async function createWedding(details, categoryChoices = DEFAULT_CATEGORIE
     guestCount,
     currency: details.currency || 'USD',
     theme: details.theme || 'sage',
+    taskTemplateVersion: TASK_TEMPLATE_VERSION,
     createdAt: nowIso(),
     updatedAt: nowIso(),
   }
@@ -428,6 +434,47 @@ export async function addTask(weddingId, { title, dueMonthOffset = 0, dueDate = 
   })
   await touch(weddingId)
   return id
+}
+
+/**
+ * Adds checklist items introduced since this wedding was created.
+ *
+ * Only tasks from template versions *newer* than the one the wedding was built
+ * with are considered, so deleting a task you don't want stays deleted — a
+ * later top-up won't bring it back. Titles are matched as a second guard
+ * against duplicates. Safe and cheap to call on every load: once the stored
+ * version matches, it does nothing.
+ *
+ * @returns {Promise<number>} how many were added
+ */
+export async function topUpTasks(weddingId) {
+  const wedding = await getWedding(weddingId)
+  if (!wedding) return 0
+
+  const from = Number(wedding.taskTemplateVersion) || 1
+  if (from >= TASK_TEMPLATE_VERSION) return 0
+
+  const existing = await db.tasks.where('weddingId').equals(weddingId).toArray()
+  const titles = new Set(existing.map((t) => t.title.trim().toLowerCase()))
+
+  const additions = DEFAULT_TASKS.filter(
+    ([, title, introducedIn = 1]) =>
+      introducedIn > from && !titles.has(title.trim().toLowerCase()),
+  ).map(([dueMonthOffset, title]) => ({
+    id: uid(),
+    weddingId,
+    title,
+    dueMonthOffset,
+    dueDate: '',
+    done: false,
+  }))
+
+  await db.transaction('rw', db.tasks, db.weddings, async () => {
+    if (additions.length) await db.tasks.bulkAdd(additions)
+    await db.weddings.update(weddingId, { taskTemplateVersion: TASK_TEMPLATE_VERSION })
+  })
+
+  return additions.length
 }
 
 export async function updateTask(id, changes) {

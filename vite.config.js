@@ -16,7 +16,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
-      registerType: 'prompt',
+      // autoUpdate, not prompt: a prompt only applies when someone taps a
+      // toast, so a phone that misses it stays on an old build forever. Every
+      // edit is already autosaved to IndexedDB within ~500ms, so swapping the
+      // app out from under the user costs nothing.
+      registerType: 'autoUpdate',
       injectRegister: null,
       includeAssets: [
         'favicon.svg',

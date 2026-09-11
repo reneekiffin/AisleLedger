@@ -2,12 +2,21 @@ import { useMemo, useState } from 'react'
 import { useWedding, useWeddingTable } from '../../state/WeddingProvider'
 import { useTrackedAction } from '../../hooks/useAutosave'
 import { Screen } from '../../components/Screen'
-import { Card, EmptyState } from '../../components/ui/Card'
+import { Card, EmptyState, SectionHeader } from '../../components/ui/Card'
 import { Button } from '../../components/ui/Button'
 import { Sheet } from '../../components/ui/Sheet'
 import { TextArea, TextField } from '../../components/ui/Field'
 import { PlusIcon } from '../../components/nav/Icons'
-import { addTimelineEntry, deleteTimelineEntry, listTimeline } from '../../db/repo'
+import {
+  addTimelineEntry,
+  deleteTimelineEntry,
+  listTimeline,
+  seedDayTimeline,
+  updateTimelineEntry,
+} from '../../db/repo'
+import { buildTimelineIcs } from '../../lib/ics'
+import { shareTextFile } from '../../lib/share'
+import { buildTimelineShare, encodeShare, isTooLong, shareLink, shareUrl } from '../../lib/sharelink'
 import { formatLongDate } from '../../lib/dates'
 
 export default function DayTimeline() {
@@ -15,6 +24,35 @@ export default function DayTimeline() {
   const entries = useWeddingTable(listTimeline) ?? []
   const track = useTrackedAction()
   const [adding, setAdding] = useState(false)
+  const [note, setNote] = useState('')
+
+  const addToCalendar = async () => {
+    try {
+      const ics = buildTimelineIcs(wedding, entries)
+      const slug = (wedding?.coupleNames || 'wedding')
+        .replace(/[^\w]+/g, '-')
+        .replace(/^-|-$/g, '')
+        .toLowerCase()
+      const outcome = await shareTextFile(ics, `${slug || 'wedding'}-day.ics`, 'text/calendar')
+      if (outcome !== 'cancelled') {
+        setNote('Calendar file ready — open it to add the day to your calendar.')
+      }
+    } catch (err) {
+      setNote(err.message)
+    }
+  }
+
+  const sharePlan = async () => {
+    const fragment = await encodeShare(buildTimelineShare(wedding, entries))
+    const url = shareUrl(fragment)
+    if (isTooLong(url)) {
+      setNote('This timeline is too long to fit in a link. Export the calendar file instead.')
+      return
+    }
+    const outcome = await shareLink(url, `${wedding?.coupleNames ?? 'Our'} wedding day`)
+    if (outcome === 'copied') setNote('Link copied — paste it to whoever needs it.')
+    else if (outcome === 'failed') setNote("Couldn't share the link on this device.")
+  }
 
   const ordered = useMemo(
     () => entries.slice().sort((a, b) => (a.time < b.time ? -1 : a.time > b.time ? 1 : 0)),
@@ -40,8 +78,17 @@ export default function DayTimeline() {
       {ordered.length === 0 ? (
         <EmptyState
           title="Plan the day hour by hour"
-          body="Hair and make-up, first look, ceremony, speeches, last dance — everything in order."
-          action={<Button onClick={() => setAdding(true)}>Add the first moment</Button>}
+          body="Start from a typical running order and change the times to suit you, or build it from scratch."
+          action={
+            <div className="flex flex-col gap-2.5">
+              <Button onClick={() => track(() => seedDayTimeline(weddingId))}>
+                Start from a typical day
+              </Button>
+              <Button variant="secondary" onClick={() => setAdding(true)}>
+                Add the first moment myself
+              </Button>
+            </div>
+          }
         />
       ) : (
         <ol className="relative space-y-3 border-l border-line pl-6">
@@ -53,9 +100,17 @@ export default function DayTimeline() {
               />
               <Card className="flex items-start gap-3">
                 <div className="min-w-0 flex-1">
-                  <p className="font-serif text-lg tabular-nums leading-none text-primary-deep">
-                    {entry.time}
-                  </p>
+                  <label className="inline-flex">
+                    <span className="sr-only">Time for {entry.title}</span>
+                    <input
+                      type="time"
+                      value={entry.time}
+                      onChange={(e) =>
+                        track(() => updateTimelineEntry(entry.id, { time: e.target.value }))
+                      }
+                      className="tap rounded-lg border border-line bg-surface px-2 py-1 font-serif text-lg tabular-nums text-primary-deep focus-ring"
+                    />
+                  </label>
                   <p className="mt-1.5 font-medium">{entry.title}</p>
                   {entry.note && <p className="mt-1 text-sm text-muted">{entry.note}</p>}
                 </div>
@@ -71,6 +126,25 @@ export default function DayTimeline() {
             </li>
           ))}
         </ol>
+      )}
+
+      {ordered.length > 0 && (
+        <section className="mt-7">
+          <SectionHeader title="Share the day" hint="For the party, the vendors, anyone" />
+          <div className="flex flex-col gap-2.5">
+            <Button full variant="secondary" onClick={addToCalendar}>
+              Add to calendar (.ics)
+            </Button>
+            <Button full variant="secondary" onClick={sharePlan}>
+              Share as a link
+            </Button>
+          </div>
+          {note && <p className="mt-2 text-center text-sm text-muted">{note}</p>}
+          <p className="mt-3 text-center text-xs leading-relaxed text-muted">
+            The calendar file adds every moment as an event. The link carries a read-only copy
+            inside it — nothing is uploaded, but anyone with the link can open it.
+          </p>
+        </section>
       )}
 
       <AddMomentSheet

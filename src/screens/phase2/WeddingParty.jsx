@@ -7,6 +7,7 @@ import { Button } from '../../components/ui/Button'
 import { ConfirmSheet, Sheet } from '../../components/ui/Sheet'
 import { CurrencyField, SelectField, TextArea, TextField, Toggle } from '../../components/ui/Field'
 import { PlusIcon } from '../../components/nav/Icons'
+import { buildPartyShare, encodeShare, isTooLong, shareLink, shareUrl } from '../../lib/sharelink'
 import { formatMoney, parseMoney } from '../../lib/money'
 import {
   PARTY_ROLES,
@@ -22,26 +23,30 @@ import {
 /** Roles are grouped so a long party still reads as a list of small groups. */
 const ROLE_ORDER = new Map(PARTY_ROLES.map((role, index) => [role, index]))
 
-function MemberSheet({ open, onClose, member, currency, onSubmit, onDelete }) {
+function MemberSheet({ open, onClose, member, prefill, currency, suggestions, onSubmit, onDelete }) {
   const editing = !!member
   const [form, setForm] = useState({})
   const [seeded, setSeeded] = useState(null)
   const [confirmDelete, setConfirmDelete] = useState(false)
 
-  const key = member?.id ?? '__new'
+  // `prefill` is a member being copied: everything comes across except the
+  // name, which is the one field that genuinely has to be retyped.
+  const source = member ?? prefill
+  const key = member?.id ?? (prefill ? `copy-${prefill.id}` : '__new')
+
   if (open && seeded !== key) {
     setSeeded(key)
     setForm({
       name: member?.name ?? '',
-      role: member?.role ?? 'Bridesmaid',
+      role: source?.role ?? 'Bridesmaid',
       phone: member?.phone ?? '',
       email: member?.email ?? '',
-      outfit: member?.outfit ?? '',
-      outfitUrl: member?.outfitUrl ?? '',
+      outfit: source?.outfit ?? '',
+      outfitUrl: source?.outfitUrl ?? '',
       size: member?.size ?? '',
-      colour: member?.colour ?? '',
-      cost: member ? String(member.cost || '') : '',
-      paidBy: member?.paidBy ?? '',
+      colour: source?.colour ?? '',
+      cost: source ? String(source.cost || '') : '',
+      paidBy: source?.paidBy ?? '',
       ordered: !!member?.ordered,
       notes: member?.notes ?? '',
     })
@@ -55,7 +60,8 @@ function MemberSheet({ open, onClose, member, currency, onSubmit, onDelete }) {
       <Sheet
         open={open}
         onClose={onClose}
-        title={editing ? form.name || 'Edit' : 'Add to the party'}
+        title={editing ? form.name || 'Edit' : prefill ? `Another like ${prefill.name}` : 'Add to the party'}
+        description={prefill ? 'Outfit, colour and cost copied — just add the name' : undefined}
         footer={
           <div className="flex gap-3 pb-1">
             {editing && (
@@ -112,6 +118,8 @@ function MemberSheet({ open, onClose, member, currency, onSubmit, onDelete }) {
               <TextField
                 label="Outfit"
                 placeholder="Birdy Grey — Ryan dress"
+                list="party-outfits"
+                hint={suggestions.outfits.length ? 'Tap the field to reuse one you already entered' : undefined}
                 value={form.outfit ?? ''}
                 onChange={(e) => set('outfit', e.target.value)}
               />
@@ -121,6 +129,7 @@ function MemberSheet({ open, onClose, member, currency, onSubmit, onDelete }) {
                 inputMode="url"
                 autoCapitalize="none"
                 placeholder="birdygrey.com/products/…"
+                list="party-urls"
                 hint="Paste the exact product page so nobody orders the wrong shade"
                 value={form.outfitUrl ?? ''}
                 onChange={(e) => set('outfitUrl', e.target.value)}
@@ -128,12 +137,14 @@ function MemberSheet({ open, onClose, member, currency, onSubmit, onDelete }) {
               <div className="grid grid-cols-2 gap-3">
                 <TextField
                   label="Size"
+                  list="party-sizes"
                   value={form.size ?? ''}
                   onChange={(e) => set('size', e.target.value)}
                 />
                 <TextField
                   label="Colour"
                   placeholder="Sage"
+                  list="party-colours"
                   value={form.colour ?? ''}
                   onChange={(e) => set('colour', e.target.value)}
                 />
@@ -147,6 +158,7 @@ function MemberSheet({ open, onClose, member, currency, onSubmit, onDelete }) {
               <TextField
                 label="Paid by"
                 placeholder="Her own / us"
+                list="party-payers"
                 value={form.paidBy ?? ''}
                 onChange={(e) => set('paidBy', e.target.value)}
               />
@@ -165,6 +177,21 @@ function MemberSheet({ open, onClose, member, currency, onSubmit, onDelete }) {
             value={form.notes ?? ''}
             onChange={(e) => set('notes', e.target.value)}
           />
+
+          {/* Everything already typed for someone else, one tap away. */}
+          {Object.entries({
+            'party-outfits': suggestions.outfits,
+            'party-colours': suggestions.colours,
+            'party-sizes': suggestions.sizes,
+            'party-payers': suggestions.payers,
+            'party-urls': suggestions.urls,
+          }).map(([id, values]) => (
+            <datalist key={id} id={id}>
+              {values.map((value) => (
+                <option key={value} value={value} />
+              ))}
+            </datalist>
+          ))}
         </div>
       </Sheet>
 
@@ -252,13 +279,44 @@ function ShopLinkSheet({ open, onClose, onSubmit }) {
 }
 
 export default function WeddingParty() {
-  const { weddingId, currency } = useWedding()
+  const { wedding, weddingId, currency } = useWedding()
   const party = useWeddingTable(listParty) ?? []
   const shops = useWeddingTable(listShopLinks) ?? []
   const track = useTrackedAction()
 
   const [editing, setEditing] = useState(null) // member | '__new' | null
+  const [prefill, setPrefill] = useState(null) // member being copied
   const [addingShop, setAddingShop] = useState(false)
+  const [note, setNote] = useState('')
+
+  // Anything already typed for one person becomes a suggestion for the next.
+  const suggestions = useMemo(() => {
+    const unique = (key) => [...new Set(party.map((m) => m[key]).filter(Boolean))].sort()
+    return {
+      outfits: unique('outfit'),
+      colours: unique('colour'),
+      sizes: unique('size'),
+      payers: unique('paidBy'),
+      urls: unique('outfitUrl'),
+    }
+  }, [party])
+
+  const sharePartyList = async () => {
+    const fragment = await encodeShare(buildPartyShare(wedding, party, shops))
+    const url = shareUrl(fragment)
+    if (isTooLong(url)) {
+      setNote('This list is too long to fit in a link.')
+      return
+    }
+    const outcome = await shareLink(url, 'What to wear')
+    if (outcome === 'copied') setNote('Link copied — send it to the party.')
+    else if (outcome === 'failed') setNote("Couldn't share the link on this device.")
+  }
+
+  const duplicate = (member) => {
+    setPrefill(member)
+    setEditing('__new')
+  }
 
   const grouped = useMemo(() => {
     const groups = new Map()
@@ -403,8 +461,14 @@ export default function WeddingParty() {
                           </div>
                         </button>
 
+                        <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
+                          <Button size="sm" variant="secondary" onClick={() => duplicate(member)}>
+                            Add another like this
+                          </Button>
+                        </div>
+
                         {(member.outfitUrl || member.phone || member.email) && (
-                          <div className="mt-3 flex flex-wrap gap-2 border-t border-line pt-3">
+                          <div className="mt-2 flex flex-wrap gap-2">
                             {member.outfitUrl && (
                               <Button
                                 as="a"
@@ -444,10 +508,29 @@ export default function WeddingParty() {
         )}
       </section>
 
+      {party.length > 0 && (
+        <section className="mt-7">
+          <Button full variant="secondary" onClick={sharePartyList}>
+            Share the list with the party
+          </Button>
+          {note && <p className="mt-2 text-center text-sm text-muted">{note}</p>}
+          <p className="mt-3 text-center text-xs leading-relaxed text-muted">
+            Sends a read-only page with outfits, sizes, colours and shop links. Phone numbers,
+            emails and costs are left out. The link carries the data inside it — nothing is
+            uploaded, but anyone with the link can open it.
+          </p>
+        </section>
+      )}
+
       <MemberSheet
         open={editorOpen}
-        onClose={() => setEditing(null)}
+        onClose={() => {
+          setEditing(null)
+          setPrefill(null)
+        }}
         member={editingMember}
+        prefill={editingMember ? null : prefill}
+        suggestions={suggestions}
         currency={currency}
         onSubmit={(values) =>
           track(() =>

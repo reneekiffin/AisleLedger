@@ -8,6 +8,7 @@ import { ProgressBar } from '../components/ui/ProgressBar'
 import { Donut } from '../components/ui/Donut'
 import { Button } from '../components/ui/Button'
 import { InstallBanner } from '../components/InstallBanner'
+import { BackupReminder } from '../components/BackupReminder'
 import { ChevronIcon } from '../components/nav/Icons'
 import { formatMoney } from '../lib/money'
 import { countdown, formatLongDate, monthDiff, relativeDays, todayISO } from '../lib/dates'
@@ -91,6 +92,7 @@ export default function Dashboard() {
   return (
     <Screen title="Dashboard" eyebrow="Aisle Ledger">
       <InstallBanner />
+      <BackupReminder />
 
       <Countdown wedding={wedding} />
 

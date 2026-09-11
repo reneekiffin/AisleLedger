@@ -88,3 +88,30 @@ export const THEMES = [
   { id: 'blush', label: 'Blush', swatch: ['#B57A72', '#7C8B72', '#FAF4F2'] },
   { id: 'ivory', label: 'Ivory', swatch: ['#94805C', '#A88D89', '#FBF9F4'] },
 ]
+
+/**
+ * A typical wedding-day running order, for people staring at an empty screen.
+ *
+ * Built around a mid-afternoon ceremony because that's the most common shape;
+ * every time is a starting point to be dragged around, not a rule. Added only
+ * when someone asks for it.
+ */
+export const DEFAULT_DAY_TIMELINE = [
+  ['09:00', 'Hair and make-up starts', 'Breakfast for everyone getting ready'],
+  ['11:30', 'Photographer arrives', 'Details, dress, rings, invitations'],
+  ['12:30', 'Get into outfits', ''],
+  ['13:15', 'First look / private vows', 'Optional, but the light is good'],
+  ['14:00', 'Travel to the ceremony', ''],
+  ['14:30', 'Guests arrive and are seated', 'Ushers on the doors'],
+  ['15:00', 'Ceremony', ''],
+  ['15:45', 'Confetti and congratulations', ''],
+  ['16:00', 'Drinks reception', 'Canapés, group photos, couple portraits'],
+  ['17:45', 'Call guests to their seats', ''],
+  ['18:00', 'Wedding breakfast', ''],
+  ['19:45', 'Speeches', 'Order agreed in advance'],
+  ['20:30', 'Cake cutting', ''],
+  ['20:45', 'First dance', 'Band or DJ starts straight after'],
+  ['21:30', 'Evening food', ''],
+  ['23:30', 'Last dance', ''],
+  ['23:59', 'Carriages', 'Taxis booked, someone on bag duty'],
+]

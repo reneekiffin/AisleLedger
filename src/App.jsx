@@ -17,6 +17,7 @@ import More from './screens/More'
 import Settings from './screens/Settings'
 import Install from './screens/Install'
 import Privacy from './screens/Privacy'
+import SharedView from './screens/SharedView'
 import Guests from './screens/phase2/Guests'
 import Checklist from './screens/phase2/Checklist'
 import Seating from './screens/phase2/Seating'
@@ -25,7 +26,7 @@ import Moodboard from './screens/phase2/Moodboard'
 import WeddingParty from './screens/phase2/WeddingParty'
 
 /** Screens reachable before any wedding exists. */
-const PUBLIC_PATHS = ['/onboarding', '/privacy', '/install']
+const PUBLIC_PATHS = ['/onboarding', '/privacy', '/install', '/shared']
 
 function Splash() {
   return (
@@ -47,7 +48,8 @@ function Shell() {
   // just finished setup back to a blank step one.
   if (!hasAnyWedding && !isPublic) return <Onboarding />
 
-  const showTabs = hasAnyWedding && location.pathname !== '/onboarding'
+  const showTabs =
+    hasAnyWedding && !['/onboarding', '/shared'].includes(location.pathname)
 
   return (
     <>
@@ -62,6 +64,7 @@ function Shell() {
         <Route path="/settings" element={<Settings />} />
         <Route path="/install" element={<Install />} />
         <Route path="/privacy" element={<Privacy />} />
+        <Route path="/shared" element={<SharedView />} />
         <Route path="/onboarding" element={<Onboarding />} />
         <Route path="/guests" element={<Guests />} />
         <Route path="/checklist" element={<Checklist />} />

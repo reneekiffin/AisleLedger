@@ -1,5 +1,5 @@
 import { db, uid, nowIso, WEDDING_TABLES, SCHEMA_VERSION } from './db'
-import { DEFAULT_CATEGORIES, DEFAULT_TASKS } from './seed'
+import { DEFAULT_CATEGORIES, DEFAULT_DAY_TIMELINE, DEFAULT_TASKS } from './seed'
 
 /**
  * The only module that talks to Dexie directly.
@@ -700,6 +700,27 @@ export async function addTimelineEntry(weddingId, { time = '12:00', title, note 
   await db.timeline.add({ id, weddingId, time, title: title?.trim() || 'Moment', note })
   await touch(weddingId)
   return id
+}
+
+/**
+ * Drops a typical running order into an empty timeline so there's something to
+ * edit instead of a blank page. Refuses if entries already exist, so it can't
+ * quietly duplicate someone's real plan.
+ */
+export async function seedDayTimeline(weddingId) {
+  const existing = await db.timeline.where('weddingId').equals(weddingId).count()
+  if (existing > 0) return 0
+  await db.timeline.bulkAdd(
+    DEFAULT_DAY_TIMELINE.map(([time, title, note]) => ({
+      id: uid(),
+      weddingId,
+      time,
+      title,
+      note,
+    })),
+  )
+  await touch(weddingId)
+  return DEFAULT_DAY_TIMELINE.length
 }
 
 export async function updateTimelineEntry(id, changes) {

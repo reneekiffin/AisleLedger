@@ -1,29 +1,57 @@
 import { useEffect, useState } from 'react'
 import { registerSW } from 'virtual:pwa-register'
-import { Button } from './ui/Button'
+
+const CHECK_INTERVAL_MS = 60 * 60 * 1000 // hourly
 
 /**
  * Registers the service worker (so the app shell is cached for offline use)
- * and offers a reload when a new version has been downloaded. `prompt` mode:
- * we never swap the app out from under someone mid-edit.
+ * and keeps it current.
+ *
+ * An installed PWA can stay open for days, so waiting for a natural page load
+ * to notice a new build isn't enough — we ask the browser to re-check on a
+ * timer and whenever the app comes back to the foreground.
  */
 export function UpdateToast() {
-  const [needsRefresh, setNeedsRefresh] = useState(false)
-  const [updateSW, setUpdateSW] = useState(null)
+  const [updated, setUpdated] = useState(false)
 
   useEffect(() => {
-    // A static preview build ships no service worker; registering would 404.
-    if (import.meta.env.VITE_STATIC_PREVIEW) return
-    const update = registerSW({
+    if (import.meta.env.VITE_STATIC_PREVIEW) return undefined
+
+    let timer
+    let registration
+
+    registerSW({
       immediate: true,
+      onRegisteredSW(_url, reg) {
+        if (!reg) return
+        registration = reg
+        timer = setInterval(() => reg.update().catch(() => {}), CHECK_INTERVAL_MS)
+      },
       onNeedRefresh() {
-        setNeedsRefresh(true)
+        // With autoUpdate the worker takes over on its own; this only drives
+        // the confirmation so the change isn't silent.
+        setUpdated(true)
       },
     })
-    setUpdateSW(() => update)
+
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') registration?.update().catch(() => {})
+    }
+    document.addEventListener('visibilitychange', onVisible)
+
+    return () => {
+      clearInterval(timer)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
   }, [])
 
-  if (!needsRefresh) return null
+  useEffect(() => {
+    if (!updated) return undefined
+    const timer = setTimeout(() => setUpdated(false), 5000)
+    return () => clearTimeout(timer)
+  }, [updated])
+
+  if (!updated) return null
 
   return (
     <div
@@ -31,12 +59,7 @@ export function UpdateToast() {
       className="fixed inset-x-3 z-50 mx-auto max-w-md rounded-2xl border border-line bg-surface p-3 shadow-lift"
       style={{ bottom: 'calc(env(safe-area-inset-bottom) + 5rem)' }}
     >
-      <div className="flex items-center gap-3">
-        <p className="min-w-0 flex-1 text-sm">A new version of Aisle Ledger is ready.</p>
-        <Button size="sm" onClick={() => updateSW?.(true)}>
-          Reload
-        </Button>
-      </div>
+      <p className="text-center text-sm">Updated to the latest version ✓</p>
     </div>
   )
 }
